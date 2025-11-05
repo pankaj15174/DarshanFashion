@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Darshan Fashions</title>
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+
+<header>
+  <div class="topbar">
+    <div class="brand">Darshan <span>Fashions</span></div>
+    <nav>
+      <a href="#home" data-route="home">Home</a>
+      <div class="dropdown">
+        <a href="#products" data-route="products">Products ▾</a>
+        <div class="dropdown-menu" id="productsDropdown"></div>
+      </div>
+      <a href="#about" data-route="about">About Us</a>
+      <a href="#login" id="loginLink">Login</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <!-- HOME -->
+  <section id="view-home" class="section"></section>
+
+  <!-- PRODUCTS -->
+  <section id="view-products" class="section" style="display:none;">
+    <div class="toolbar">
+      <input type="text" id="searchBox" class="input" placeholder="Search products...">
+      <select id="sortSelect" class="input">
+        <option value="default">Sort By</option>
+        <option value="priceAsc">Price: Low to High</option>
+        <option value="priceDesc">Price: High to Low</option>
+        <option value="available">Availability</option>
+      </select>
+
+      <!-- Admin-only buttons -->
+      <button class="btn" id="addCategoryBtn" style="display:none">+ Add Category</button>
+      <button class="btn" id="addProductBtn" style="display:none">+ Add Product</button>
+      <button class="btn" id="logoutBtn" style="display:none">Logout</button>
+    </div>
+
+    <div id="productsGrid" class="products"></div>
+  </section>
+
+ <!-- ABOUT -->
+<section id="view-about" class="section" style="display:none;">
+  <h2>About Darshan Fashions</h2>
+  <p>We offer premium ladies wear including Nighties, Blouses, Petticoats, and Plazos. Browse our catalogue and order directly on WhatsApp!</p>
+
+  <p>We also provide <strong>Free Home Delivery</strong> near Kukatpally area on orders above ₹200 and also offer <strong>Cash on Delivery (COD)</strong>.</p>
+
+  <!-- Add some spacing before address -->
+  <hr style="margin:20px 0; border:0; border-top:1px solid #ddd;">
+
+  <h3>📍 Address</h3>
+  <address style="line-height:1.6;">
+    Bandaris Building,<br>
+    Ground Floor,<br>
+    Kamalamma Colony,<br>
+    Mahadevpuram,<br>
+    Kukatpally, 500055<br>
+    <strong>📞 Mobile:</strong> <a href="tel:+918179771029">8179771029</a>
+  </address>
+
+  <!-- Disclaimers or additional notes -->
+  <p style="margin-top:20px; font-size:14px; color:gray;">
+    *All prices are inclusive of taxes. Product availability may vary. Delivery timing depends on location.
+  </p>
+</section>
+</main>
+
+<footer>
+  <p>© <span id="year"></span> Darshan Fashions. All rights reserved.</p>
+  
+  <p style="margin-top:10px; font-size:14px;">
+    📍 Bandaris Building, Ground Floor, Kamalamma Colony, Mahadevpuram, Kukatpally - 500055 <br>
+    📞 <a href="tel:+918179771029">8179771029</a> | WhatsApp: <a href="https://wa.me/918179771029">Click to Chat</a>
+  </p>
+</footer>
+
+<!-- LOGIN MODAL -->
+<div class="modal" id="loginModal">
+  <div class="modal-box">
+  <h3>Admin Login</h3>
+  <input type="password" id="adminPin" class="input" placeholder="Enter Admin PIN">
+  
+  <div class="row" style="gap:8px; margin-top:6px;">
+    <button class="btn primary" id="adminLoginBtn">Login</button>
+    <button class="btn" id="guestLoginBtn">Continue as Guest</button>
+  </div>
+
+  <!-- 🔹 Add this line below -->
+  <button class="btn" id="openChangePinModal" style="margin-top:10px;">Change Password (PIN)</button>
+
+  <button class="btn" id="closeLoginBtn">Close</button>
+</div>
+</div>
+
+<!-- FIRST-TIME SECURITY QUESTION -->
+<div class="modal" id="securityModal">
+  <div class="modal-box">
+    <h3>Set Security Question</h3>
+    <select id="securityQuestion" class="input">
+      <option value="">Select Security Question</option>
+      <option value="dog">What is your dog name?</option>
+      <option value="nickname">What is your nick name?</option>
+      <option value="surname">What is your surname?</option>
+      <option value="village">What is your village name?</option>
+    </select>
+    <input type="text" id="securityAnswer" class="input" placeholder="Enter Answer">
+    <button class="btn primary" id="saveSecurityBtn">Save</button>
+  </div>
+</div>
+
+<!-- ADD CATEGORY -->
+<div class="modal" id="categoryModal">
+  <div class="modal-box">
+    <h3>Add Category</h3>
+    <input type="text" id="newCategoryName" class="input" placeholder="Category Name">
+    <div class="row" style="gap:8px; margin-top:6px;">
+      <button class="btn primary" id="saveCategoryBtn">Save</button>
+      <button class="btn" id="closeCategoryBtn">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD PRODUCT -->
+<div class="modal" id="productModal">
+  <div class="modal-box">
+    <h3>Add Product</h3>
+
+    <select id="productCategory" class="input">
+      <option value="">-- Select Category --</option>
+    </select>
+
+    <input type="text" id="productName" class="input" placeholder="Product Name">
+    <input type="number" id="productMRP" class="input" placeholder="MRP (₹)">
+    <input type="number" id="productPrice" class="input" placeholder="Special Price (₹)">
+    <label>Quantity (Stock Available)</label>
+    <input type="number" id="productQty" class="input" value="1" min="0" placeholder="Enter quantity">
+    <label class="muted" style="display:block; margin-top:6px;">Product Image:</label>
+    <input type="file" id="productImageFile" accept="image/*" class="input">
+    <div class="center muted" style="margin:6px 0;">OR</div>
+    <input type="text" id="productImage" class="input" placeholder="Paste Image URL (Optional)">
+
+    <select id="productStock" class="input">
+      <option value="true">Available</option>
+      <option value="false">Out of Stock</option>
+    </select>
+
+    <div class="row" style="gap:8px; margin-top:6px;">
+      <button class="btn primary" id="saveProductBtn">Save Product</button>
+      <button class="btn" id="closeProductBtn">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Change PIN Modal -->
+<div class="modal" id="changePinModal">
+  <div class="modal-box">
+    <h3>Change Admin PIN</h3>
+
+    <!-- Step 1: Ask Security Question -->
+    <div id="changePinStep1">
+      <p id="securityQuestionText" class="muted"></p>
+      <input type="text" id="securityAnswerVerify" class="input" placeholder="Enter Answer">
+      <div style="text-align:right; margin-top:10px;">
+        <button class="btn" id="cancelChangePin">Cancel</button>
+        <button class="btn primary" id="verifySecurityAnswer">Verify</button>
+      </div>
+    </div>
+
+    <!-- Step 2: Set New PIN -->
+    <div id="changePinStep2" style="display:none;">
+      <input type="password" id="newPinInput" class="input" placeholder="Enter New PIN">
+      <div style="text-align:right; margin-top:10px;">
+        <button class="btn" id="cancelNewPin">Cancel</button>
+        <button class="btn primary" id="saveNewPin">Save New PIN</button>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Image Preview Modal -->
+<div class="modal" id="imagePreviewModal">
+  <div class="modal-box" style="max-width:800px; padding:0; position:relative;">
+    <img id="previewImage" src="" style="width:100%; height:auto; display:block;">
+    <button class="btn" id="closeImagePreview" 
+      style="position:absolute; top:10px; right:10px; background:red; color:white;">
+      ✕
+    </button>
+  </div>
+</div>
+
+
+<script src="script.js"></script>
+
+
+</body>
+</html>
