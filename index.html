@@ -5,6 +5,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Darshan Fashions</title>
   <link rel="stylesheet" href="style.css"/>
+
+  <!-- ✅ Supabase JS Library -->
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+
+  <!-- ✅ Supabase Init (replace with your values — already filled for you) -->
+  <script>
+    // IMPORTANT: For learning/demo, this uses the public anon key on the frontend.
+    // Make sure your policies allow what you expect (see note after code).
+    window.__SUPABASE_URL__ = "https://lezpqaymzlkvkalevwmq.supabase.co";
+    window.__SUPABASE_ANON_KEY__ = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxlenBxYXltemxrdmthbGV2d21xIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI0MDMyMDEsImV4cCI6MjA3Nzk3OTIwMX0.I6i83kLdcfmy2Cmoq7ZRvdar3Vdnb5saImCrEvoxHsU";
+    window.__SUPABASE_BUCKET__ = "product-images";
+  </script>
 </head>
 <body>
 
@@ -54,7 +66,6 @@
 
   <p>We also provide <strong>Free Home Delivery</strong> near Kukatpally area on orders above ₹200 and also offer <strong>Cash on Delivery (COD)</strong>.</p>
 
-  <!-- Add some spacing before address -->
   <hr style="margin:20px 0; border:0; border-top:1px solid #ddd;">
 
   <h3>📍 Address</h3>
@@ -67,7 +78,6 @@
     <strong>📞 Mobile:</strong> <a href="tel:+918179771029">8179771029</a>
   </address>
 
-  <!-- Disclaimers or additional notes -->
   <p style="margin-top:20px; font-size:14px; color:gray;">
     *All prices are inclusive of taxes. Product availability may vary. Delivery timing depends on location.
   </p>
@@ -76,7 +86,6 @@
 
 <footer>
   <p>© <span id="year"></span> Darshan Fashions. All rights reserved.</p>
-  
   <p style="margin-top:10px; font-size:14px;">
     📍 Bandaris Building, Ground Floor, Kamalamma Colony, Mahadevpuram, Kukatpally - 500055 <br>
     📞 <a href="tel:+918179771029">8179771029</a> | WhatsApp: <a href="https://wa.me/918179771029">Click to Chat</a>
@@ -94,9 +103,7 @@
     <button class="btn" id="guestLoginBtn">Continue as Guest</button>
   </div>
 
-  <!-- 🔹 Add this line below -->
   <button class="btn" id="openChangePinModal" style="margin-top:10px;">Change Password (PIN)</button>
-
   <button class="btn" id="closeLoginBtn">Close</button>
 </div>
 </div>
@@ -185,6 +192,7 @@
     </div>
   </div>
 </div>
+
 <!-- Image Preview Modal -->
 <div class="modal" id="imagePreviewModal">
   <div class="modal-box" style="max-width:800px; padding:0; position:relative;">
@@ -196,9 +204,7 @@
   </div>
 </div>
 
-
+<!-- Your app logic -->
 <script src="script.js"></script>
-
-
 </body>
 </html>
