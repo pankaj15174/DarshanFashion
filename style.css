@@ -40,8 +40,31 @@ header{
   max-width:1100px; margin:0 auto; padding:16px;
   display:flex; align-items:center; justify-content:space-between;
 }
-.brand{font-size:22px; font-weight:800; letter-spacing:.2px}
+.brand{
+  font-size:22px; 
+  font-weight:800; 
+  letter-spacing:.2px;
+  display: flex;
+  align-items: center;
+  gap: 8px; /* Space between logo and full name */
+}
+/* Style for "Fashions" span */
 .brand span{color:var(--accent)}
+
+/* NEW: DF Logo Styling */
+.logo-df {
+    font-size: 28px; /* Larger initials */
+    font-weight: 900;
+    margin-right: 2px;
+    line-height: 1;
+}
+.logo-d {
+    color: var(--brand); /* Black/Dark Gray */
+}
+.logo-f {
+    color: var(--accent); /* Red */
+}
+
 nav{display:flex; align-items:center; gap:14px}
 nav a{
   display:inline-block; padding:8px 12px; border-radius:8px;
@@ -103,7 +126,7 @@ nav a:hover, nav a.active{ background:#f3f4f6 }
 }
 /* 🎨 END OF FONT SIZE UPDATE */
 
-/* 🆕 NEW: Horizontal scroll container for colors/sizes */
+/* 🆕 Horizontal scroll container for colors/sizes */
 .color-options-container {
     display: flex;
     gap: 6px;
@@ -290,7 +313,12 @@ footer a:hover {
     flex-wrap: wrap; 
   }
   .brand {
-    font-size: 18px;
+    /* Reduce font size for the full name, but keep logo size */
+    font-size: 16px; 
+    gap: 4px;
+  }
+  .logo-df {
+      font-size: 24px; /* Slightly reduced DF logo size for mobile */
   }
   nav {
     /* Ensure nav items are clearly spaced */

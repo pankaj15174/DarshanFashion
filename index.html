@@ -22,27 +22,33 @@
 
 <header>
   <div class="topbar">
-    <div class="brand">Darshan <span>Fashions</span></div>
+    <!-- UPDATED: Brand logo to include DF and the full name -->
+    <div class="brand">
+        <span class="logo-df">
+            <span class="logo-d">D</span><span class="logo-f">F</span>
+        </span>
+        Darshan <span>Fashions</span>
+    </div>
     <nav>
       <a href="#home" data-route="home">Home</a>
       <div class="dropdown">
-        <a href="#products" data-route="products" id="productsLink">Products ▾</a>
+        <a href="#products" data-route="products">Products ▾</a>
         <div class="dropdown-menu" id="productsDropdown"></div>
       </div>
       <a href="#about" data-route="about">About Us</a>
       <a href="#login" id="loginLink">Login</a>
     </nav>
   </div>
-  <!-- INFO BANNER: Moved inside header but outside topbar/nav for correct stacking -->
   <div class="info-banner">
-    <p>
-      <strong>About Darshan Fashions:</strong> We offer premium ladies wear including
-      Nighties, Blouses, Petticoats, and Plazos. Browse our catalogue and order directly on WhatsApp!
-      <br class="mobile-break">
-      <strong>Free Home Delivery</strong> near Kukatpally / Mahadevpuram / Jagadgirigutta area on orders above ₹300 |
-      <strong>Cash on Delivery (COD) is also</strong> available.
-    </p>
-  </div>
+  <p>
+    <strong>About Darshan Fashions:</strong> We offer premium ladies wear including
+    Nighties, Blouses, Petticoats, and Plazos. Browse our catalogue and order directly on WhatsApp!
+    <br>
+    <strong>Free Home Delivery</strong> near Kukatpally / Mahadevpuram / Jagadgirigutta area on orders above ₹300 |
+    <strong>Cash on Delivery (COD) is also</strong> available.
+  </p>
+</div>
+
 </header>
 
 <main>
@@ -74,7 +80,7 @@
   <h2>About Darshan Fashions</h2>
   <p>We offer premium ladies wear including Nighties, Blouses, Petticoats, and Plazos. Browse our catalogue and order directly on WhatsApp!</p>
 
-  <p>We also provide <strong>Free Home Delivery</strong> near Kukatpally / Mahadevpuram / Jagadgirigutta area on orders above ₹300 and we also offer <strong>Cash on Delivery (COD)</strong>.</p>
+  <p>We also provide <strong>Free Home Delivery</strong> near Kukatpally / Mahadevpuram / Jagadgirigutta area on orders above ₹200 and also offer <strong>Cash on Delivery (COD)</strong>.</p>
 
   <hr style="margin:20px 0; border:0; border-top:1px solid #ddd;">
 
@@ -101,14 +107,6 @@
     📞 <a href="tel:+918179771029">8179771029</a> | WhatsApp: <a href="https://wa.me/918179771029">Click to Chat</a>
   </p>
 </footer>
-
-<!-- LOADING MODAL (NEW) -->
-<div class="modal" id="loadingModal">
-  <div class="modal-box center" style="max-width:200px; padding:30px;">
-    <div class="loader"></div>
-    <p style="margin-top:20px;">Saving Product...</p>
-  </div>
-</div>
 
 <!-- LOGIN MODAL -->
 <div class="modal" id="loginModal">
@@ -223,6 +221,15 @@
     </button>
   </div>
 </div>
+
+<!-- Loading Modal (For Admin Actions) -->
+<div class="modal" id="loadingModal">
+  <div class="modal-box" style="max-width:200px; text-align:center; padding:20px;">
+    <div class="loader"></div>
+    <p style="margin-top:15px; font-weight:600;">Processing...</p>
+  </div>
+</div>
+
 
 <!-- Your app logic -->
 <script src="script.js"></script>
