@@ -2,6 +2,7 @@
  Darshan Fashions – Supabase Edition
  - Products, Categories, Admin PIN/Security via Supabase
  - Images via Supabase Storage (product-images)
+ - Color (multi) + Size (multi) selection with WhatsApp order
 ********************************************/
 
 /* ---------- Supabase Client ---------- */
@@ -15,9 +16,13 @@ const BUCKET = window.__SUPABASE_BUCKET__;
 let isAdmin = false;
 let selectedCategoryId = null;
 let editingProductId = null;
-let categoriesCache = [];  // [{id,name}]
-let productsCache = [];    // products result with joined category if needed
-let adminConfig = null;    // {admin_pin, security_question, security_answer}
+let categoriesCache = [];   // [{id,name}]
+let productsCache = [];     // products with joined category if needed
+let adminConfig = null;     // {id, admin_pin, security_question, security_answer}
+
+/* Per-product selections */
+const selectedColors = {};  // { [productId]: "Black" }
+const selectedSizes  = {};  // { [productId]: "XL" }
 
 /* ---------- Helpers ---------- */
 const $ = (id) => document.getElementById(id);
@@ -26,6 +31,27 @@ if (yearEl) yearEl.textContent = new Date().getFullYear();
 
 function money(n) { return Number(n || 0); }
 function sanitize(str) { return (str || "").toString().trim(); }
+
+/* Split a comma/pipe separated string into trimmed, unique options */
+function parseOptions(str) {
+  if (!str) return [];
+  return Array.from(
+    new Set(
+      str
+        .split(/[,|]/g)
+        .map(s => sanitize(s))
+        .filter(Boolean)
+    )
+  );
+}
+
+// Helper to show/hide loading spinner
+function showLoading() {
+  $("loadingModal").classList.add("open");
+}
+function hideLoading() {
+  $("loadingModal").classList.remove("open");
+}
 
 /* ---------- Elements ---------- */
 const viewHome = $("view-home");
@@ -82,10 +108,13 @@ const productMRP = $("productMRP");
 const productPrice = $("productPrice");
 const productImage = $("productImage");
 const productImageFile = $("productImageFile");
-const productStock = $("productStock"); // not used in db, only derived from quantity
+const productStock = $("productStock"); // derived from quantity
 const productQty = $("productQty");
 const saveProductBtn = $("saveProductBtn");
 const closeProductBtn = $("closeProductBtn");
+/* New fields for options (comma- or | -separated) */
+const productColor = $("productColor");   // e.g. "Black, White, Cream"
+const productSizes = $("productSizes");   // e.g. "S, M, L, XL"
 
 /* Image Preview */
 const imagePreviewModal = $("imagePreviewModal");
@@ -124,7 +153,6 @@ document.querySelectorAll("nav a").forEach((a) =>
  * Supabase – Admin Config
  ***********************/
 async function ensureAdminConfigRow() {
-  // Try to load the row
   const { data, error } = await supabase
     .from("admin_config")
     .select("*")
@@ -137,7 +165,6 @@ async function ensureAdminConfigRow() {
   }
 
   if (!data) {
-    // Insert default
     const { error: insErr } = await supabase
       .from("admin_config")
       .insert([{ admin_pin: "admin123", security_question: null, security_answer: null }]);
@@ -164,8 +191,8 @@ async function adminLoginFromSupabase(pin) {
 }
 
 async function setSecurityQuestion(qKey, ans) {
-  await refreshAdminConfig(); // fetch latest row
-  const { id } = adminConfig; // get the actual UUID
+  await refreshAdminConfig();
+  const { id } = adminConfig;
 
   const { error } = await supabase
     .from("admin_config")
@@ -173,33 +200,32 @@ async function setSecurityQuestion(qKey, ans) {
       security_question: qKey,
       security_answer: sanitize(ans).toLowerCase()
     })
-    .eq("id", id); // ✅ update ONLY row with this ID
+    .eq("id", id);
 
   if (error) {
     console.error("Error saving security question:", error);
-    alert("❌ Failed to save security question!");
+    // Removed alert
   } else {
-    alert("✅ Security question saved successfully!");
+    // Removed alert
   }
 }
 
-// ✅ Update Admin PIN securely using ID
 async function changeAdminPin(newPin) {
-  await refreshAdminConfig();   // get the latest data from DB
-  const { id } = adminConfig;  // extract row ID
+  await refreshAdminConfig();
+  const { id } = adminConfig;
 
   const { error } = await supabase
     .from("admin_config")
     .update({
-      admin_pin: sanitize(newPin)   // sanitize before saving
+      admin_pin: sanitize(newPin)
     })
-    .eq("id", id);  // ✅ updates exact row only
+    .eq("id", id);
 
   if (error) {
     console.error("❌ Error updating PIN:", error);
-    alert("Failed to change PIN!");
+    // Removed alert
   } else {
-    alert("✅ PIN updated successfully!");
+    // Removed alert
   }
 }
 
@@ -234,7 +260,8 @@ async function addCategoryToSupabase(name) {
 }
 
 async function deleteCategoryFromSupabase(catId) {
-  if (!confirm("Delete this category and all products under it?")) return;
+  // Use custom modal or keep standard confirm for simplicity here
+  if (!window.confirm("Delete this category and all products under it?")) return;
   const { error } = await supabase
     .from("categories")
     .delete()
@@ -247,14 +274,11 @@ async function deleteCategoryFromSupabase(catId) {
   await fetchProducts();
 }
 
-/***********************
- * Supabase – Products
- ***********************/
 async function fetchProducts() {
-  // Join category name for rendering convenience
+  // include 'color' and 'sizes' in the select list
   const { data, error } = await supabase
     .from("products")
-    .select("id,name,category_id,mrp,price,quantity,img_url, categories(name)")
+    .select("id,name,category_id,mrp,price,quantity,img_url,color,sizes, categories(name)")
     .order("name", { ascending: true });
 
   if (error) {
@@ -265,44 +289,47 @@ async function fetchProducts() {
   productsCache = data || [];
 }
 
-async function addProductToSupabase({ name, categoryId, mrp, price, quantity, imgUrl }) {
+async function addProductToSupabase({ name, categoryId, mrp, price, quantity, imgUrl, color, sizes }) {
   const payload = {
     name: sanitize(name),
     category_id: categoryId,
     mrp: money(mrp),
     price: money(price),
     quantity: Number.isFinite(quantity) ? quantity : 1,
-    img_url: imgUrl
+    img_url: imgUrl,
+    color: sanitize(color),             // CSV for colors
+    sizes: sanitize(sizes)              // CSV for sizes
   };
 
   const { error } = await supabase.from("products").insert([payload]);
   if (error) {
-    alert("Failed to add product!");
     console.error(error);
-    return false;
+    return { ok: false, message: "Failed to add product!" };
   }
-  return true;
+  return { ok: true, message: "✅ Product added successfully!" };
 }
 
-async function updateProductInSupabase(id, { name, categoryId, mrp, price, quantity }) {
+async function updateProductInSupabase(id, { name, categoryId, mrp, price, quantity, color, sizes }) {
   const payload = {
     name: sanitize(name),
     category_id: categoryId,
     mrp: money(mrp),
     price: money(price),
-    quantity: Number.isFinite(quantity) ? quantity : 1
+    quantity: Number.isFinite(quantity) ? quantity : 1,
+    color: sanitize(color),
+    sizes: sanitize(sizes)
   };
   const { error } = await supabase.from("products").update(payload).eq("id", id);
   if (error) {
-    alert("Failed to update product!");
     console.error(error);
-    return false;
+    return { ok: false, message: "Failed to update product!" };
   }
-  return true;
+  return { ok: true, message: "✅ Product updated!" };
 }
 
 async function deleteProductFromSupabase(id) {
-  if (!confirm("Delete this product?")) return;
+  // Use custom modal or keep standard confirm for simplicity here
+  if (!window.confirm("Delete this product?")) return;
   const { error } = await supabase.from("products").delete().eq("id", id);
   if (error) {
     alert("Failed to delete product!");
@@ -337,14 +364,14 @@ adminLoginBtn.addEventListener("click", async () => {
     isAdmin = true;
     loginModal.classList.remove("open");
 
-    // First-time security question
     if (!adminConfig || !adminConfig.security_question) {
       securityModal.classList.add("open");
     } else {
       enableAdminControls();
     }
   } else {
-    alert("Incorrect PIN");
+    // Note: Kept standard alert here as this is outside the main app flow
+    window.alert("Incorrect PIN");
   }
 });
 
@@ -361,7 +388,7 @@ saveSecurityBtn.addEventListener("click", async () => {
   const q = securityQuestion.value;
   const ans = securityAnswer.value;
   if (!q || !sanitize(ans)) {
-    alert("Please select a question and enter answer!");
+    window.alert("Please select a question and enter answer!");
     return;
   }
   await setSecurityQuestion(q, ans);
@@ -416,7 +443,7 @@ verifySecurityAnswerBtn.addEventListener("click", async () => {
     changePinStep1.style.display = "none";
     changePinStep2.style.display = "block";
   } else {
-    alert("Incorrect answer!");
+    window.alert("Incorrect answer!");
   }
 });
 
@@ -427,11 +454,10 @@ cancelNewPinBtn.addEventListener("click", () => {
 saveNewPinBtn.addEventListener("click", async () => {
   const newPin = sanitize(newPinInput.value);
   if (!newPin) {
-    alert("PIN cannot be empty!");
+    window.alert("PIN cannot be empty!");
     return;
   }
-
-  await changeAdminPin(newPin);     // ✅ Using updated logic
+  await changeAdminPin(newPin);
   changePinModal.classList.remove("open");
 });
 
@@ -439,7 +465,7 @@ saveNewPinBtn.addEventListener("click", async () => {
  * Category Management
  ***********************/
 addCategoryBtn.addEventListener("click", () => {
-  if (!isAdmin) return alert("Admin only.");
+  if (!isAdmin) return window.alert("Admin only.");
   categoryModal.classList.add("open");
 });
 closeCategoryBtn.addEventListener("click", () => {
@@ -447,9 +473,9 @@ closeCategoryBtn.addEventListener("click", () => {
 });
 
 saveCategoryBtn.addEventListener("click", async () => {
-  if (!isAdmin) return alert("Admin only.");
+  if (!isAdmin) return window.alert("Admin only.");
   const name = sanitize(newCategoryName.value);
-  if (!name) return alert("Please enter a category name");
+  if (!name) return window.alert("Please enter a category name");
   await addCategoryToSupabase(name);
   newCategoryName.value = "";
   categoryModal.classList.remove("open");
@@ -459,7 +485,7 @@ saveCategoryBtn.addEventListener("click", async () => {
  * Product Management (Add / Edit / Delete)
  ***********************/
 addProductBtn.addEventListener("click", async () => {
-  if (!isAdmin) return alert("Admin only.");
+  if (!isAdmin) return window.alert("Admin only.");
   editingProductId = null;
   productModal.classList.add("open");
 
@@ -476,6 +502,8 @@ addProductBtn.addEventListener("click", async () => {
   productImage.value = "";
   productImageFile.value = "";
   productStock.value = "true";
+  if (productColor) productColor.value = "";   // CSV for colors
+  if (productSizes) productSizes.value = "";   // CSV for sizes
 
   // Enable image inputs in create mode
   productImage.disabled = false;
@@ -488,69 +516,80 @@ closeProductBtn.addEventListener("click", () => {
 });
 
 saveProductBtn.addEventListener("click", async () => {
-  if (!isAdmin) return alert("Admin only.");
+  if (!isAdmin) return window.alert("Admin only.");
 
   if (!productCategory.value || !sanitize(productName.value) || !productMRP.value) {
-    alert("Please enter Category, Product Name, and MRP!");
+    window.alert("Please enter Category, Product Name, and MRP!");
     return;
   }
 
+  showLoading(); // Show loading spinner
+
+  let result = { ok: false, message: "" };
+
   // EDIT mode
   if (editingProductId) {
-    const ok = await updateProductInSupabase(editingProductId, {
+    result = await updateProductInSupabase(editingProductId, {
       name: productName.value,
       categoryId: productCategory.value,
       mrp: productMRP.value,
       price: productPrice.value || 0,
-      quantity: Number(productQty.value || 0)
+      quantity: Number(productQty.value || 0),
+      color: productColor ? productColor.value : "",
+      sizes: productSizes ? productSizes.value : ""
     });
-    if (ok) {
-      productModal.classList.remove("open");
-      editingProductId = null;
-      alert("✅ Product updated!");
-      await fetchProducts();
-      renderProducts();
-    }
-    return;
-  }
-
-  // CREATE mode
-  let imgUrl = "";
-  const file = productImageFile && productImageFile.files ? productImageFile.files[0] : null;
-  if (file) {
-    imgUrl = await uploadImageToSupabase(file);
-    if (!imgUrl) return; // upload failed
-  } else if (sanitize(productImage.value)) {
-    imgUrl = sanitize(productImage.value);
+    
   } else {
-    imgUrl = `https://dummyimage.com/600x600/f3f4f6/555&text=${encodeURIComponent(productName.value)}`;
+    // CREATE mode
+    let imgUrl = "";
+    const file = productImageFile && productImageFile.files ? productImageFile.files[0] : null;
+    if (file) {
+      const uploadUrl = await uploadImageToSupabase(file);
+      if (!uploadUrl) {
+        hideLoading();
+        return; // upload failed (alert handled inside uploadImageToSupabase)
+      }
+      imgUrl = uploadUrl;
+    } else if (sanitize(productImage.value)) {
+      imgUrl = sanitize(productImage.value);
+    } else {
+      // Dummy image fallback
+      imgUrl = `https://dummyimage.com/600x600/f3f4f6/555&text=${encodeURIComponent(productName.value)}`;
+    }
+
+    result = await addProductToSupabase({
+      name: productName.value,
+      categoryId: productCategory.value,
+      mrp: productMRP.value,
+      price: productPrice.value || 0,
+      quantity: Number(productQty.value || 1),
+      imgUrl,
+      color: productColor ? productColor.value : "",
+      sizes: productSizes ? productSizes.value : ""
+    });
   }
 
-  const ok = await addProductToSupabase({
-    name: productName.value,
-    categoryId: productCategory.value,
-    mrp: productMRP.value,
-    price: productPrice.value || 0,
-    quantity: Number(productQty.value || 1),
-    imgUrl
-  });
+  hideLoading(); // Hide loading spinner
 
-  if (ok) {
+  if (result.ok) {
     productModal.classList.remove("open");
-    alert("✅ Product added successfully!");
+    window.alert(result.message);
     await fetchProducts();
     renderProducts();
+  } else {
+    // Show error message if not ok
+    window.alert(result.message);
   }
 });
 
 window.deleteProduct = async function (id) {
-  if (!isAdmin) return alert("Admin only.");
+  if (!isAdmin) return window.alert("Admin only.");
   await deleteProductFromSupabase(id);
 };
 
 window.editProduct = function (id) {
-  if (!isAdmin) return alert("Admin only.");
-  const p = productsCache.find(pr => pr.id === id);
+  if (!isAdmin) return window.alert("Admin only.");
+  const p = productsCache.find(pr => String(pr.id) === String(id));
   if (!p) return;
   editingProductId = id;
 
@@ -566,12 +605,71 @@ window.editProduct = function (id) {
   productMRP.value = p.mrp;
   productPrice.value = p.price || 0;
   productQty.value = typeof p.quantity === "number" ? p.quantity : 1;
+  if (productColor) productColor.value = p.color || "";
+  if (productSizes) productSizes.value = p.sizes || "";
 
   // Disable image inputs in edit mode (image not editable in this simple flow)
   productImage.disabled = true;
   productImageFile.disabled = true;
 };
 
+/***********************
+ * Color/Size selection + WhatsApp (functions are used in Part 2)
+ ***********************/
+window.selectColor = function (productId, color, element) {
+  selectedColors[productId] = color;
+  
+  // 1. Remove 'selected' class from all color buttons for this product
+  const container = element.closest('.meta');
+  container.querySelectorAll('.color-btn').forEach(btn => btn.classList.remove('selected'));
+
+  // 2. Add 'selected' class to the clicked button
+  element.classList.add('selected');
+
+  // Removed alert()
+};
+
+window.selectSize = function (productId, size, element) {
+  selectedSizes[productId] = size;
+  
+  // 1. Remove 'selected' class from all size buttons for this product
+  const container = element.closest('.meta');
+  container.querySelectorAll('.size-btn').forEach(btn => btn.classList.remove('selected'));
+
+  // 2. Add 'selected' class to the clicked button
+  element.classList.add('selected');
+
+  // Removed alert()
+};
+
+window.openWhatsApp = function (productId) {
+  const p = productsCache.find(x => String(x.id) === String(productId));
+  if (!p) return;
+
+  const mrp = money(p.mrp);
+  const special = money(p.price);
+  const hasSpecial = special > 0 && special < mrp;
+
+  // No longer mandatory, check if they exist
+  const chosenColor = selectedColors[productId] || "Not Selected (Customer needs to choose)";
+  const chosenSize  = selectedSizes[productId]  || "Not Selected (Customer needs to choose)";
+
+  const msg =
+    `🛍 *Product Enquiry*\n` +
+    `Name: ${p.name}\n` +
+    `Color: ${chosenColor}\n` +
+    `Size: ${chosenSize}\n` +
+    `Price: ₹${hasSpecial ? special : mrp}\n` +
+    `Image: ${p.img_url}\n\n` +
+    `Please confirm availability.`;
+
+  const url = `https://wa.me/918179771029?text=${encodeURIComponent(msg)}`;
+  window.open(url, "_blank");
+};
+
+/***********************
+ * Render (continues in Part 2)
+ ***********************/
 /***********************
  * Render
  ***********************/
@@ -619,77 +717,126 @@ window.openCategory = async function (catId) {
 function renderProducts() {
   let list = productsCache.slice();
 
+  // Category filter
   if (selectedCategoryId) {
     list = list.filter((p) => p.category_id === selectedCategoryId);
   }
 
+  // Search filter
   const q = (searchBox.value || "").toLowerCase();
   if (q) list = list.filter((p) => p.name.toLowerCase().includes(q));
 
+  // Sorting
   const effectivePrice = (p) => (p.price && p.price > 0 ? p.price : p.mrp || 0);
   const effectiveQty = (p) => (typeof p.quantity === "number" ? p.quantity : 0);
-
   const sort = sortSelect.value;
   if (sort === "priceAsc") list.sort((a, b) => effectivePrice(a) - effectivePrice(b));
   if (sort === "priceDesc") list.sort((a, b) => effectivePrice(b) - effectivePrice(a));
   if (sort === "available") list.sort((a, b) => (effectiveQty(b) > 0) - (effectiveQty(a) > 0));
 
+  // Build UI
   productsGrid.innerHTML = list
     .map((p) => {
-      const catName = p.categories?.name || (categoriesCache.find(c => c.id === p.category_id)?.name) || "Category";
+      const catName =
+        p.categories?.name ||
+        (categoriesCache.find(c => c.id === p.category_id)?.name) ||
+        "Category";
       const mrp = money(p.mrp);
       const special = money(p.price);
       const hasSpecial = special > 0 && special < mrp;
       const qty = effectiveQty(p);
       const inStock = qty > 0;
 
+      // Parse multi-colors and sizes CSVs
+      const colorOptions = parseOptions(p.color);
+      const sizeOptions  = parseOptions(p.sizes);
+
+      // Pre-select first option if nothing is selected yet
+      if (colorOptions.length && !selectedColors[p.id]) {
+        selectedColors[p.id] = colorOptions[0];
+      }
+      if (sizeOptions.length && !selectedSizes[p.id]) {
+        selectedSizes[p.id] = sizeOptions[0];
+      }
+
+
       return `
-      <div class="product">
-        <img src="${p.img_url}" class="thumb" onclick="openImagePreview('${p.img_url}')">
-        <div class="meta">
-          <strong>${p.name}</strong>
-          <div class="muted">${catName}</div>
+        <div class="product">
+          <img src="${p.img_url}" class="thumb" onclick="openImagePreview('${p.img_url}')">
+          <div class="meta">
+            <strong>${p.name}</strong>
+            <div class="muted">${catName}</div>
 
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:5px;">
-            <div>
-              <span class="price price-mrp">₹${mrp}</span>
-              ${hasSpecial ? `<span class="price-special">₹${special}</span>` : ""}
+            <!-- COLORS -->
+            ${colorOptions.length ? `
+              <div style="margin-top:6px;">
+                <strong>Color:</strong>
+                <div class="color-options-container" style="margin-top:4px;">
+                  ${colorOptions
+                    .map(color => `
+                      <button 
+                        class="btn color-btn ${selectedColors[p.id] === color ? 'selected' : ''}" 
+                        onclick="selectColor('${p.id}', '${color}', this)">
+                        ${color}
+                      </button>
+                    `)
+                    .join('')}
+                </div>
+              </div>
+            ` : ""}
+
+            <!-- SIZES -->
+            ${sizeOptions.length ? `
+              <div style="margin-top:6px;">
+                <strong>Size:</strong>
+                <div class="color-options-container" style="margin-top:4px;">
+                  ${sizeOptions
+                    .map(size => `
+                      <button
+                        class="btn size-btn ${selectedSizes[p.id] === size ? 'selected' : ''}"
+                        onclick="selectSize('${p.id}', '${size}', this)">
+                        ${size}
+                      </button>
+                    `)
+                    .join('')}
+                </div>
+              </div>
+            ` : ""}
+
+            <!-- Price and Stock -->
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:5px;">
+              <div>
+                <span class="price price-mrp">₹${mrp}</span>
+                ${hasSpecial ? `<span class="price-special">₹${special}</span>` : ""}
+              </div>
+              <span class="badge ${inStock ? "ok" : "na"}">
+                ${inStock ? `Available (${qty})` : "Out of Stock"}
+              </span>
             </div>
-            <span class="badge ${inStock ? "ok" : "na"}">
-              ${inStock ? `Available (${qty})` : "Out of Stock"}
-            </span>
-          </div>
 
-          <div style="display:flex; gap:8px; margin-top:10px;">
-  ${
-    isAdmin
-      ? `
-        <button class="btn" onclick="editProduct('${p.id}')">Edit</button>
-        <button class="btn" style="background:#ef4444; color:#fff;" onclick="deleteProductFromSupabase('${p.id}')">
-          Delete
-        </button>`
-      : ""
-  }
-  ${
-    inStock
-      ? `
-        <a class="btn" style="flex:1; text-align:center;"
-          href="https://wa.me/918179771029?text=${encodeURIComponent(
-            `🛍 *Product Enquiry*\n` +
-            `Name: ${p.name}\n` +
-            `Price: ₹${hasSpecial ? special : mrp}\n` +
-            `Image: ${p.img_url}\n\n` +
-            `Please confirm availability.`
-          )}"
-          target="_blank">
-          Order on WhatsApp
-        </a>`
-      : `<span style="flex:1"></span>`
-  }
-</div>
+            <!-- Action Buttons -->
+            <div style="display:flex; gap:8px; margin-top:10px;">
+              ${
+                isAdmin
+                  ? `
+                    <button class="btn" onclick="editProduct('${p.id}')">Edit</button>
+                    <button class="btn" style="background:#ef4444;color:#fff;" onclick="deleteProductFromSupabase('${p.id}')">
+                      Delete
+                    </button>
+                  `
+                  : ""
+              }
+              ${
+                inStock
+                  ? `<button class="btn primary" style="flex:1;" onclick="openWhatsApp('${p.id}')">
+                      Order on WhatsApp
+                    </button>`
+                  : `<span style="flex:1"></span>`
+              }
+            </div>
+          </div>
         </div>
-      </div>
-    `;
+      `;
     })
     .join("");
 
@@ -740,4 +887,4 @@ async function init() {
 }
 init();
 
-console.log("✅ Supabase App Loaded");
+console.log("✅ Supabase App Loaded with Color & Size Support and Responsive Fixes");

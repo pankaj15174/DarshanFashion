@@ -19,6 +19,9 @@ body{
   margin:0; background:var(--bg); color:#111;
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, Inter, Arial, sans-serif;
   -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
+  /* Fix 1: Ensure content isn't forced to a minimum width */
+  min-width: 0;
+  overflow-x: hidden;
 }
 
 /* ---------- Layout ---------- */
@@ -27,7 +30,10 @@ main{max-width:1100px;margin:0 auto;padding:18px 16px}
 
 /* ---------- Header / Topbar / Nav ---------- */
 header{
-  background:#fff; position:sticky; top:0; z-index:50;
+  background:#fff; 
+  position:sticky; 
+  top:0; 
+  z-index:100; /* Increased z-index to ensure it stays on top */
   border-bottom:1px solid var(--border);
 }
 .topbar{
@@ -44,14 +50,82 @@ nav a{
 nav a:hover, nav a.active{ background:#f3f4f6 }
 
 /* Dropdown */
-.dropdown{position:relative}
+.dropdown{
+  position:relative;
+  /* Fix 2: Ensure dropdown content is not cut off by sticky banner */
+  z-index: 101; 
+}
 .dropdown-menu{
   position:absolute; top:40px; left:0; min-width:220px;
   background:#fff; border:1px solid var(--border); border-radius:12px;
   box-shadow:var(--shadow); display:none; overflow:hidden;
 }
-.dropdown:hover .dropdown-menu{display:block}
+.dropdown:hover .dropdown-menu,
+.dropdown:focus-within .dropdown-menu { /* Focus-within for accessibility */
+  display:block;
+}
 .dropdown-menu a{display:block; padding:10px 14px}
+
+/* Fix 2: Top Info Banner - Adjusted position */
+.info-banner {
+  background: #fff8f9;
+  color: #b91c1c;
+  text-align: center;
+  font-size: 14px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  /* Removed sticky positioning and top offset, it's now just a static banner inside the sticky header */
+  z-index: 99; /* Lower than topbar/dropdown */
+}
+.info-banner p {
+  margin: 0;
+  line-height: 1.4;
+}
+
+/* 🎨 START OF FONT SIZE UPDATE: Reduced font and padding for smaller buttons */
+.color-btn, .size-btn {
+  background: #f3f4f6;
+  border: 1px solid #ccc;
+  padding: 4px 8px; /* Reduced padding for smaller buttons */
+  border-radius: 6px; 
+  cursor: pointer;
+  font-size: 12px; /* Reduced font size for smaller buttons */
+  font-weight: 500;
+  transition: all 0.2s ease;
+  line-height: 1.2;
+}
+
+.color-btn.selected, .size-btn.selected {
+  background: var(--brand); /* Dark background */
+  color: white;
+  border-color: var(--brand);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+/* 🎨 END OF FONT SIZE UPDATE */
+
+/* 🆕 NEW: Horizontal scroll container for colors/sizes */
+.color-options-container {
+    display: flex;
+    gap: 6px;
+    /* Enable horizontal scrolling, hide vertical */
+    overflow-x: auto;
+    overflow-y: hidden;
+    /* Ensure elements stay in one line */
+    white-space: nowrap; 
+    /* Disable the scrollbar in webkit browsers (optional, but cleaner) */
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 4px; /* Space for the scrollbar if visible */
+}
+
+/* Hide scrollbar for cleaner look (Webkit browsers like Chrome, Safari) */
+.color-options-container::-webkit-scrollbar {
+    height: 4px;
+}
+.color-options-container::-webkit-scrollbar-thumb {
+    background: var(--muted);
+    border-radius: 999px;
+}
+
 
 /* ---------- Inputs & Buttons ---------- */
 .input, select{
@@ -74,8 +148,19 @@ nav a:hover, nav a.active{ background:#f3f4f6 }
   display:flex; gap:10px; align-items:center; flex-wrap:wrap;
   margin-bottom:16px;
 }
-.toolbar .input{max-width:260px}
-.toolbar select{max-width:180px;}
+/* Mobile optimization for toolbar */
+@media (max-width: 560px) {
+  .toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .toolbar .input, .toolbar select {
+    max-width: 100%; /* Full width on mobile */
+  }
+  .toolbar button {
+    width: 100%;
+  }
+}
 
 /* ---------- Home Category Grid ---------- */
 .grid{
@@ -89,7 +174,7 @@ nav a:hover, nav a.active{ background:#f3f4f6 }
   overflow:hidden; box-shadow:var(--shadow); transition:transform .15s ease;
 }
 .card:hover{ transform:translateY(-3px) }
-.thumb{ width:100%; height:180px; object-fit:cover; background:#f3f4f6 }
+.thumb{ width:100%; height:200px; object-fit:contain; background:#f3f4f6 }
 .card-body{ padding:12px; font-weight:700 }
 
 /* ---------- Products Grid ---------- */
@@ -112,7 +197,7 @@ nav a:hover, nav a.active{ background:#f3f4f6 }
   position: relative;
   color: red;
   font-weight: bold;
-  text-decoration: none; /* remove horizontal line */
+  text-decoration: none;
 }
 
 /* Add diagonal strikethrough */
@@ -124,7 +209,7 @@ nav a:hover, nav a.active{ background:#f3f4f6 }
   width: 100%;
   height: 1.5px;
   background: rgb(41, 40, 40);
-  transform: rotate(-14deg);  /* Diagonal angle */
+  transform: rotate(-14deg);
   transform-origin: center;
 }
 .price-special{ color:var(--blue); font-weight:800; margin-left:8px; }
@@ -138,7 +223,7 @@ nav a:hover, nav a.active{ background:#f3f4f6 }
 /* ---------- Modal ---------- */
 .modal{
   position:fixed; inset:0; background:rgba(0,0,0,.5);
-  display:none; align-items:center; justify-content:center; padding:16px; z-index:999;
+  display:none; align-items:center; justify-content:center; padding:16px; z-index:9999; /* High Z-index for modals */
 }
 .modal.open{ display:flex }
 .modal-box{
@@ -152,6 +237,14 @@ nav a:hover, nav a.active{ background:#f3f4f6 }
 /* ---------- Footer ---------- */
 footer{
   text-align:center; color:var(--muted); padding:24px 12px; border-top:1px solid var(--border);
+  line-height: 1.5;
+}
+footer a {
+  color: var(--accent);
+  text-decoration: none;
+}
+footer a:hover {
+  text-decoration: underline;
 }
 
 /* ---------- Helpers ---------- */
@@ -165,45 +258,56 @@ footer{
   cursor: zoom-in;
   transition: transform 0.2s ease-in-out;
 }
-
 #imagePreviewModal img.zoomed {
   transform: scale(2); /* Zoom level */
   cursor: zoom-out;
 }
 
-footer {
-  text-align: center;
-  color: var(--muted);
-  padding: 20px 12px;
-  border-top: 1px solid var(--border);
-  line-height: 1.5;
-}
-
-footer a {
-  color: var(--accent);
-  text-decoration: none;
-}
-
-footer a:hover {
-  text-decoration: underline;
-}
-/* Product image style - Show full image, fit inside box, no overflow */
-.thumb {
-  width: 100%;
-  height: 200px;           /* or your current height */
-  object-fit: contain;     /* ✅ Shows full image */
-  border-radius: 8px;
-  background-color: #f3f3f3; /* light background for empty spaces */
-}
-
 #previewImage {
   max-width: 90vw;
   max-height: 90vh;
-  object-fit: contain;  /* ✅ Show full image inside modal */
+  object-fit: contain;
 }
 
-.thumb {
-  width: 100%;
-  max-height: 200px;
-  object-fit: contain;
+/* Fix 4: Loading Spinner CSS */
+.loader {
+  border: 4px solid #f3f3f3; /* Light grey */
+  border-top: 4px solid var(--accent); /* Brand color */
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  animation: spin 1s linear infinite;
+  margin: 0 auto;
+}
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@media (max-width: 480px) {
+  .topbar {
+    /* Allow wrapping of the brand name and navigation if necessary */
+    flex-wrap: wrap; 
+  }
+  .brand {
+    font-size: 18px;
+  }
+  nav {
+    /* Ensure nav items are clearly spaced */
+    gap: 8px;
+  }
+  nav a {
+    padding: 6px 8px;
+    font-size: 14px;
+  }
+  .topbar {
+    padding: 12px;
+  }
+  .info-banner p {
+    font-size: 12px;
+  }
+  /* Remove line break on small screens for better flow */
+  .mobile-break {
+    display: none; 
+  }
 }
