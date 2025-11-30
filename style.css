@@ -93,9 +93,9 @@ nav a:hover, nav a.active{ background:#f3f4f6 }
 .info-banner {
   background: #fff8f9;
   color: #b91c1c;
-  text-align: center;
+  text-align: left;
   font-size: 14px;
-  padding: 8px 12px;
+  padding: 18px 12px;
   border-bottom: 1px solid var(--border);
   /* Removed sticky positioning and top offset, it's now just a static banner inside the sticky header */
   z-index: 99; /* Lower than topbar/dropdown */
@@ -249,10 +249,20 @@ nav a:hover, nav a.active{ background:#f3f4f6 }
   display:none; align-items:center; justify-content:center; padding:16px; z-index:9999; /* High Z-index for modals */
 }
 .modal.open{ display:flex }
+
+/* UPDATED: Modal Box to enable scrolling for long forms */
 .modal-box{
-  background:#fff; width:100%; max-width:500px; border-radius:14px;
-  border:1px solid var(--border); overflow:hidden; box-shadow:var(--shadow);
+  background:#fff; 
+  width:100%; 
+  max-width:500px; 
+  border-radius:14px;
+  border:1px solid var(--border); 
+  box-shadow:var(--shadow);
   padding:16px;
+  
+  /* NEW: Enable vertical scrolling if content exceeds viewport height */
+  max-height: 90vh; /* Limit modal height to 90% of viewport height */
+  overflow-y: auto; /* Enable vertical scrollbar */
 }
 .modal-box h3{ margin:0 0 8px 0 }
 .modal-box .input{ margin:8px 0 }
@@ -263,7 +273,8 @@ footer{
   line-height: 1.5;
 }
 footer a {
-  color: var(--accent);
+  /* 🟨 UPDATED: Change link color from --accent (red) to --blue */
+  color: var(--blue); 
   text-decoration: none;
 }
 footer a:hover {

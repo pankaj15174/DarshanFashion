@@ -3,6 +3,10 @@
  - Products, Categories, Admin PIN/Security via Supabase
  - Images via Supabase Storage (product-images)
  - Color (multi) + Size (multi) selection with WhatsApp order
+ - UPDATED: Color-specific image handling on EDIT only
+ - UPDATED: Default image is editable
+ - UPDATED: No color is pre-selected on page load. Default image is shown.
+ - 🟨 FIX: Dynamic image source for Image Preview Modal.
 ********************************************/
 
 /* ---------- Supabase Client ---------- */
@@ -23,6 +27,11 @@ let adminConfig = null;     // {id, admin_pin, security_question, security_answe
 /* Per-product selections */
 const selectedColors = {};  // { [productId]: "Black" }
 const selectedSizes  = {};  // { [productId]: "XL" }
+const selectedImages = {};  // { [productId]: "URL" } To store the currently displayed image
+
+/* State for Color Images in Admin Flow */
+let colorImagesData = {}; // { "ColorName": "ImageURL" }
+
 
 /* ---------- Helpers ---------- */
 const $ = (id) => document.getElementById(id);
@@ -115,6 +124,15 @@ const closeProductBtn = $("closeProductBtn");
 /* New fields for options (comma- or | -separated) */
 const productColor = $("productColor");   // e.g. "Black, White, Cream"
 const productSizes = $("productSizes");   // e.g. "S, M, L, XL"
+
+/* Color Image Management Elements */
+const manageColorImagesBtn = $("manageColorImagesBtn");
+const colorImageModal = $("colorImageModal");
+const colorImageProductName = $("colorImageProductName");
+const colorImageInputs = $("colorImageInputs");
+const saveColorImagesBtn = $("saveColorImagesBtn");
+const closeColorImageBtn = $("closeColorImageBtn");
+
 
 /* Image Preview */
 const imagePreviewModal = $("imagePreviewModal");
@@ -275,10 +293,10 @@ async function deleteCategoryFromSupabase(catId) {
 }
 
 async function fetchProducts() {
-  // include 'color' and 'sizes' in the select list
+  // include 'color', 'sizes' AND 'color_images_json' in the select list
   const { data, error } = await supabase
     .from("products")
-    .select("id,name,category_id,mrp,price,quantity,img_url,color,sizes, categories(name)")
+    .select("id,name,category_id,mrp,price,quantity,img_url,color,sizes,color_images_json, categories(name)")
     .order("name", { ascending: true });
 
   if (error) {
@@ -287,9 +305,14 @@ async function fetchProducts() {
     return;
   }
   productsCache = data || [];
+  
+  // Initialize selectedImages with the default img_url for each product
+  productsCache.forEach(p => {
+    selectedImages[p.id] = p.img_url;
+  });
 }
 
-async function addProductToSupabase({ name, categoryId, mrp, price, quantity, imgUrl, color, sizes }) {
+async function addProductToSupabase({ name, categoryId, mrp, price, quantity, imgUrl, color, sizes, colorImagesJson }) { 
   const payload = {
     name: sanitize(name),
     category_id: categoryId,
@@ -298,7 +321,8 @@ async function addProductToSupabase({ name, categoryId, mrp, price, quantity, im
     quantity: Number.isFinite(quantity) ? quantity : 1,
     img_url: imgUrl,
     color: sanitize(color),             // CSV for colors
-    sizes: sanitize(sizes)              // CSV for sizes
+    sizes: sanitize(sizes),              // CSV for sizes
+    color_images_json: colorImagesJson || null 
   };
 
   const { error } = await supabase.from("products").insert([payload]);
@@ -309,15 +333,72 @@ async function addProductToSupabase({ name, categoryId, mrp, price, quantity, im
   return { ok: true, message: "✅ Product added successfully!" };
 }
 
-async function updateProductInSupabase(id, { name, categoryId, mrp, price, quantity, color, sizes }) {
+// script.js (Around line 334)
+
+/***********************
+ * Admin Login Flow
+ ***********************/
+adminLoginBtn.addEventListener("click", async () => {
+  const pin = adminPinInput.value;
+  const ok = await adminLoginFromSupabase(pin);
+  if (ok) {
+    isAdmin = true;
+    loginModal.classList.remove("open");
+
+    if (!adminConfig || !adminConfig.security_question) {
+      securityModal.classList.add("open");
+    } else {
+      enableAdminControls();
+    }
+  } else {
+    // Note: Kept standard alert here as this is outside the main app flow
+    window.alert("Incorrect PIN");
+  }
+});
+
+guestLoginBtn.addEventListener("click", () => {
+  isAdmin = false;
+  loginModal.classList.remove("open");
+});
+
+closeLoginBtn.addEventListener("click", () => {
+  loginModal.classList.remove("open");
+});
+
+saveSecurityBtn.addEventListener("click", async () => {
+// ... (rest of saveSecurityBtn logic)
+});
+
+// 🟨 NEW: Handle Enter key press on login modal
+loginModal.addEventListener("keydown", (e) => {
+    // Check if the Enter key was pressed (keyCode 13 or key 'Enter')
+    if (e.key === 'Enter' || e.keyCode === 13) {
+        
+        // Prevent default action (like form submission or browser navigation)
+        e.preventDefault(); 
+        
+        // Check if the current focused element is the PIN input or the Admin Login button
+        if (document.activeElement === adminPinInput || document.activeElement === adminLoginBtn) {
+            // Programmatically click the login button
+            adminLoginBtn.click();
+        } else if (document.activeElement === guestLoginBtn) {
+            // Allow logging in as guest via Enter
+            guestLoginBtn.click();
+        }
+    }
+});
+
+async function updateProductInSupabase(id, { name, categoryId, mrp, price, quantity, imgUrl, color, sizes, colorImagesJson }) { 
   const payload = {
     name: sanitize(name),
     category_id: categoryId,
     mrp: money(mrp),
     price: money(price),
     quantity: Number.isFinite(quantity) ? quantity : 1,
+    img_url: imgUrl, 
     color: sanitize(color),
-    sizes: sanitize(sizes)
+    sizes: sanitize(sizes),
+    color_images_json: colorImagesJson || null 
   };
   const { error } = await supabase.from("products").update(payload).eq("id", id);
   if (error) {
@@ -504,10 +585,14 @@ addProductBtn.addEventListener("click", async () => {
   productStock.value = "true";
   if (productColor) productColor.value = "";   // CSV for colors
   if (productSizes) productSizes.value = "";   // CSV for sizes
+  
+  // Clear color-specific data on creation
+  colorImagesData = {};
 
   // Enable image inputs in create mode
   productImage.disabled = false;
   productImageFile.disabled = false;
+  manageColorImagesBtn.disabled = true; // Disable color image management on CREATE
 });
 
 closeProductBtn.addEventListener("click", () => {
@@ -522,39 +607,73 @@ saveProductBtn.addEventListener("click", async () => {
     window.alert("Please enter Category, Product Name, and MRP!");
     return;
   }
-
+  
+  // Check if color images are set but the color list is empty
+  const currentColors = parseOptions(productColor.value);
+  const colorImagesArePresent = Object.keys(colorImagesData).length > 0;
+  
+  if (colorImagesArePresent && currentColors.length === 0) {
+      window.alert("You have color-specific images saved, but the Color list is empty. Please enter colors or clear the images (by cancelling the product edit).");
+      return;
+  }
+  
   showLoading(); // Show loading spinner
 
   let result = { ok: false, message: "" };
 
   // EDIT mode
   if (editingProductId) {
+    let imgUrl = sanitize(productImage.value);
+    const file = productImageFile && productImageFile.files ? productImageFile.files[0] : null;
+    
+    // Check if a new file was uploaded in EDIT mode
+    if (file) {
+        const uploadUrl = await uploadImageToSupabase(file);
+        if (!uploadUrl) {
+            hideLoading();
+            return; // upload failed
+        }
+        imgUrl = uploadUrl;
+    } else if (!imgUrl) {
+        // If the admin cleared the URL and didn't upload a file
+        window.alert("Please provide a Default Product Image URL or upload a file!");
+        hideLoading();
+        return;
+    }
+
     result = await updateProductInSupabase(editingProductId, {
       name: productName.value,
       categoryId: productCategory.value,
       mrp: productMRP.value,
       price: productPrice.value || 0,
       quantity: Number(productQty.value || 0),
+      imgUrl: imgUrl, // Pass the (potentially new) default image URL
       color: productColor ? productColor.value : "",
-      sizes: productSizes ? productSizes.value : ""
+      sizes: productSizes ? productSizes.value : "",
+      colorImagesJson: JSON.stringify(colorImagesData) 
     });
     
   } else {
     // CREATE mode
     let imgUrl = "";
     const file = productImageFile && productImageFile.files ? productImageFile.files[0] : null;
+    
     if (file) {
       const uploadUrl = await uploadImageToSupabase(file);
       if (!uploadUrl) {
         hideLoading();
-        return; // upload failed (alert handled inside uploadImageToSupabase)
+        return; 
       }
       imgUrl = uploadUrl;
     } else if (sanitize(productImage.value)) {
       imgUrl = sanitize(productImage.value);
-    } else {
-      // Dummy image fallback
-      imgUrl = `https://dummyimage.com/600x600/f3f4f6/555&text=${encodeURIComponent(productName.value)}`;
+    } 
+    
+    // Final check for default image
+    if (!imgUrl || imgUrl.includes("dummyimage")) {
+        window.alert("Please provide a Default Product Image URL or upload a file!");
+        hideLoading();
+        return;
     }
 
     result = await addProductToSupabase({
@@ -565,7 +684,8 @@ saveProductBtn.addEventListener("click", async () => {
       quantity: Number(productQty.value || 1),
       imgUrl,
       color: productColor ? productColor.value : "",
-      sizes: productSizes ? productSizes.value : ""
+      sizes: productSizes ? productSizes.value : "",
+      colorImagesJson: JSON.stringify(colorImagesData)
     });
   }
 
@@ -607,14 +727,112 @@ window.editProduct = function (id) {
   productQty.value = typeof p.quantity === "number" ? p.quantity : 1;
   if (productColor) productColor.value = p.color || "";
   if (productSizes) productSizes.value = p.sizes || "";
+  
+  // Populate colorImagesData state
+  colorImagesData = {};
+  if (p.color_images_json) {
+    try {
+      colorImagesData = JSON.parse(p.color_images_json);
+    } catch (e) {
+      console.error("Error parsing color_images_json:", e);
+    }
+  }
+  
+  productImage.value = p.img_url || ""; 
 
-  // Disable image inputs in edit mode (image not editable in this simple flow)
-  productImage.disabled = true;
-  productImageFile.disabled = true;
+  // Enable default image inputs in EDIT mode
+  productImage.disabled = false; 
+  productImageFile.disabled = false; 
+  manageColorImagesBtn.disabled = false; 
 };
 
+// Color Image Management Modal Logic
+manageColorImagesBtn.addEventListener("click", () => {
+  const colors = parseOptions(productColor.value);
+  if (!colors.length) {
+    window.alert("Please first enter the product colors in the main form (e.g., Red, Blue) to manage color-specific images.");
+    return;
+  }
+
+  // Ensure current product name is available for the modal title
+  const currentName = sanitize(productName.value) || (
+    editingProductId ? productsCache.find(p => p.id === editingProductId)?.name : 'New Product'
+  );
+  colorImageProductName.textContent = currentName;
+
+  renderColorImageInputs(colors);
+
+  productModal.classList.remove("open");
+  colorImageModal.classList.add("open");
+});
+
+closeColorImageBtn.addEventListener("click", () => {
+  colorImageModal.classList.remove("open");
+  productModal.classList.add("open"); // Return to main product modal
+});
+
+function renderColorImageInputs(colors) {
+  colorImageInputs.innerHTML = colors.map(color => {
+    const currentUrl = colorImagesData[color] || "";
+    // Use a unique ID for the file input to handle multiple uploads
+    const fileInputId = `colorImageUpload_${color.replace(/\s/g, '_')}`;
+
+    return `
+      <div style="margin-bottom: 12px; padding: 10px; border: 1px solid var(--border); border-radius: 8px;">
+        <strong>${color} Image:</strong>
+        <input type="text" id="colorImageUrl_${color}" class="input" 
+          placeholder="Paste Image URL for ${color}" value="${currentUrl}" style="margin-top: 5px;">
+        <div class="center muted" style="margin:6px 0;">OR</div>
+        <input type="file" id="${fileInputId}" accept="image/*" class="input" 
+          onchange="handleColorImageUpload(this, '${color}')">
+        ${currentUrl ? `<img src="${currentUrl}" style="width:50px; height:50px; margin-fit:cover; border-radius:4px;">` : ''}
+      </div>
+    `;
+  }).join('');
+}
+
+// Helper to handle single color image file upload
+window.handleColorImageUpload = async function (fileInput, color) {
+  const file = fileInput.files[0];
+  if (!file) return;
+
+  showLoading();
+  const uploadUrl = await uploadImageToSupabase(file);
+  hideLoading();
+
+  if (uploadUrl) {
+    colorImagesData[color] = uploadUrl;
+    // Update the text input with the new URL and re-render the list
+    renderColorImageInputs(parseOptions(productColor.value)); 
+  } else {
+    // Clear the file input if upload failed
+    fileInput.value = ''; 
+  }
+};
+
+saveColorImagesBtn.addEventListener("click", () => {
+  // 1. Gather all data from the URL input fields
+  const colors = parseOptions(productColor.value);
+  const tempColorData = {};
+  
+  colors.forEach(color => {
+    const urlInput = $(`colorImageUrl_${color}`);
+    const url = sanitize(urlInput ? urlInput.value : "");
+    if (url) {
+      tempColorData[color] = url;
+    }
+  });
+
+  // 2. Update the main state
+  colorImagesData = tempColorData;
+
+  // 3. Close the modal and return to the main product form
+  colorImageModal.classList.remove("open");
+  productModal.classList.add("open");
+});
+
 /***********************
- * Color/Size selection + WhatsApp (functions are used in Part 2)
+ * Color/Size selection + WhatsApp
  ***********************/
 window.selectColor = function (productId, color, element) {
   selectedColors[productId] = color;
@@ -625,6 +843,30 @@ window.selectColor = function (productId, color, element) {
 
   // 2. Add 'selected' class to the clicked button
   element.classList.add('selected');
+
+  // Change product image based on selection
+  const productCard = element.closest('.product');
+  const productImageEl = productCard.querySelector('.thumb');
+  
+  const p = productsCache.find(x => String(x.id) === String(productId));
+  if (!p) return;
+  
+  let newImageUrl = p.img_url; // Default to main image
+  
+  if (p.color_images_json) {
+    try {
+      const colorImages = JSON.parse(p.color_images_json);
+      // If a color-specific image exists, use it
+      if (colorImages[color]) {
+        newImageUrl = colorImages[color]; 
+      }
+    } catch (e) {
+      console.error("Error parsing color_images_json for selectColor:", e);
+    }
+  }
+
+  productImageEl.src = newImageUrl;
+  selectedImages[productId] = newImageUrl; // Update the selected image state
 
   // Removed alert()
 };
@@ -653,6 +895,9 @@ window.openWhatsApp = function (productId) {
   // No longer mandatory, check if they exist
   const chosenColor = selectedColors[productId] || "Not Selected (Customer needs to choose)";
   const chosenSize  = selectedSizes[productId]  || "Not Selected (Customer needs to choose)";
+  
+  // Use the currently visible image URL
+  const chosenImage = selectedImages[productId] || p.img_url; 
 
   const msg =
     `🛍 *Product Enquiry*\n` +
@@ -660,16 +905,24 @@ window.openWhatsApp = function (productId) {
     `Color: ${chosenColor}\n` +
     `Size: ${chosenSize}\n` +
     `Price: ₹${hasSpecial ? special : mrp}\n` +
-    `Image: ${p.img_url}\n\n` +
+    `Image: ${chosenImage}\n\n` +
     `Please confirm availability.`;
 
   const url = `https://wa.me/918179771029?text=${encodeURIComponent(msg)}`;
   window.open(url, "_blank");
 };
 
-/***********************
- * Render (continues in Part 2)
- ***********************/
+// 🟨 FIX: Update openImagePreview to use selectedImages[productId]
+window.openImagePreview = function (productId) {
+  const src = selectedImages[productId];
+  if (!src) return; // Should not happen if selectedImages is kept up to date
+
+  previewImage.src = src;
+  previewImage.classList.remove("zoomed");
+  imagePreviewModal.classList.add("open");
+};
+
+
 /***********************
  * Render
  ***********************/
@@ -750,24 +1003,35 @@ function renderProducts() {
       // Parse multi-colors and sizes CSVs
       const colorOptions = parseOptions(p.color);
       const sizeOptions  = parseOptions(p.sizes);
+      
+      // Logic to determine initial image URL and selected color
+      let initialImageUrl = p.img_url; // Default image is always the base product image
+      let selectedColorName = selectedColors[p.id] || null; // Only use explicitly selected color from cache
 
-      // Pre-select first option if nothing is selected yet
-      if (colorOptions.length && !selectedColors[p.id]) {
-        selectedColors[p.id] = colorOptions[0];
+      
+      // If a color is explicitly selected, check for a color-specific image
+      if (selectedColorName && p.color_images_json) {
+        try {
+          const colorImages = JSON.parse(p.color_images_json);
+          // Check if there is an image for the currently selected color
+          if (colorImages[selectedColorName]) {
+            initialImageUrl = colorImages[selectedColorName];
+          }
+        } catch (e) {
+          console.error("Error parsing color_images_json for renderProducts:", e);
+        }
       }
-      if (sizeOptions.length && !selectedSizes[p.id]) {
-        selectedSizes[p.id] = sizeOptions[0];
-      }
+      // Update state for image preview/WhatsApp link
+      selectedImages[p.id] = initialImageUrl;
 
 
       return `
         <div class="product">
-          <img src="${p.img_url}" class="thumb" onclick="openImagePreview('${p.img_url}')">
+          <img src="${initialImageUrl}" class="thumb" onclick="openImagePreview('${p.id}')">
           <div class="meta">
             <strong>${p.name}</strong>
             <div class="muted">${catName}</div>
 
-            <!-- COLORS -->
             ${colorOptions.length ? `
               <div style="margin-top:6px;">
                 <strong>Color:</strong>
@@ -785,7 +1049,6 @@ function renderProducts() {
               </div>
             ` : ""}
 
-            <!-- SIZES -->
             ${sizeOptions.length ? `
               <div style="margin-top:6px;">
                 <strong>Size:</strong>
@@ -803,7 +1066,6 @@ function renderProducts() {
               </div>
             ` : ""}
 
-            <!-- Price and Stock -->
             <div style="display:flex;justify-content:space-between;align-items:center;margin-top:5px;">
               <div>
                 <span class="price price-mrp">₹${mrp}</span>
@@ -814,7 +1076,6 @@ function renderProducts() {
               </span>
             </div>
 
-            <!-- Action Buttons -->
             <div style="display:flex; gap:8px; margin-top:10px;">
               ${
                 isAdmin
@@ -848,11 +1109,6 @@ function renderProducts() {
 /***********************
  * Image Preview & Zoom
  ***********************/
-window.openImagePreview = function (src) {
-  previewImage.src = src;
-  previewImage.classList.remove("zoomed");
-  imagePreviewModal.classList.add("open");
-};
 
 closeImagePreview.addEventListener("click", () => {
   imagePreviewModal.classList.remove("open");

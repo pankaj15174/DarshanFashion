@@ -6,10 +6,8 @@
   <title>Darshan Fashions</title>
   <link rel="stylesheet" href="style.css"/>
 
-  <!-- ✅ Supabase JS Library -->
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 
-  <!-- ✅ Supabase Init (replace with your values — already filled for you) -->
   <script>
     // IMPORTANT: For learning/demo, this uses the public anon key on the frontend.
     // Make sure your policies allow what you expect (see note after code).
@@ -22,7 +20,6 @@
 
 <header>
   <div class="topbar">
-    <!-- UPDATED: Brand logo to include DF and the full name -->
     <div class="brand">
         <span class="logo-df">
             <span class="logo-d">D</span><span class="logo-f">F</span>
@@ -47,15 +44,23 @@
     <strong>Free Home Delivery</strong> near Kukatpally / Mahadevpuram / Jagadgirigutta area on orders above ₹300 |
     <strong>Cash on Delivery (COD) is also</strong> available.
   </p>
+
+  <p>
+  Please help us improve by providing the 
+  <a href="https://docs.google.com/forms/d/e/1FAIpQLSezzXt6h2z7V1eROpP4DcaxC3bOmqspyC997E4c2rSFP1c1Iw/viewform?usp=publish-editor" 
+     target="_blank" 
+     rel="noopener noreferrer">
+     Feedback
+  </a>.
+</p>
+
 </div>
 
 </header>
 
 <main>
-  <!-- HOME -->
   <section id="view-home" class="section"></section>
 
-  <!-- PRODUCTS -->
   <section id="view-products" class="section" style="display:none;">
     <div class="toolbar">
       <input type="text" id="searchBox" class="input" placeholder="Search products...">
@@ -66,7 +71,6 @@
         <option value="available">Availability</option>
       </select>
 
-      <!-- Admin-only buttons -->
       <button class="btn" id="addCategoryBtn" style="display:none">+ Add Category</button>
       <button class="btn" id="addProductBtn" style="display:none">+ Add Product</button>
       <button class="btn" id="logoutBtn" style="display:none">Logout</button>
@@ -75,14 +79,22 @@
     <div id="productsGrid" class="products"></div>
   </section>
 
- <!-- ABOUT -->
-<section id="view-about" class="section" style="display:none;">
+ <section id="view-about" class="section" style="display:none;">
   <h2>About Darshan Fashions</h2>
   <p>We offer premium ladies wear including Nighties, Blouses, Petticoats, and Plazos. Browse our catalogue and order directly on WhatsApp!</p>
 
-  <p>We also provide <strong>Free Home Delivery</strong> near Kukatpally / Mahadevpuram / Jagadgirigutta area on orders above ₹200 and also offer <strong>Cash on Delivery (COD)</strong>.</p>
+  <p>We also provide <strong>Free Home Delivery</strong> near Kukatpally / Mahadevpuram / Jagadgirigutta area on orders above ₹300 and also we offer <strong>Cash on Delivery (COD)</strong>.</p>
 
-  <hr style="margin:20px 0; border:0; border-top:1px solid #ddd;">
+  <p>
+  Please help us improve by providing the 
+  <a href="https://docs.google.com/forms/d/e/1FAIpQLSezzXt6h2z7V1eROpP4DcaxC3bOmqspyC997E4c2rSFP1c1Iw/viewform?usp=publish-editor" 
+     target="_blank" 
+     rel="noopener noreferrer">
+     Feedback
+  </a>.
+</p>
+
+  <hr style="margin:30px 0; border:2; border-top:2px solid #ddd;">
 
   <h3>📍 Address</h3>
   <address style="line-height:1.6;">
@@ -108,7 +120,6 @@
   </p>
 </footer>
 
-<!-- LOGIN MODAL -->
 <div class="modal" id="loginModal">
   <div class="modal-box">
   <h3>Admin Login</h3>
@@ -124,7 +135,6 @@
 </div>
 </div>
 
-<!-- FIRST-TIME SECURITY QUESTION -->
 <div class="modal" id="securityModal">
   <div class="modal-box">
     <h3>Set Security Question</h3>
@@ -140,7 +150,6 @@
   </div>
 </div>
 
-<!-- ADD CATEGORY -->
 <div class="modal" id="categoryModal">
   <div class="modal-box">
     <h3>Add Category</h3>
@@ -152,7 +161,6 @@
   </div>
 </div>
 
-<!-- ADD PRODUCT -->
 <div class="modal" id="productModal">
   <div class="modal-box">
     <h3>Add Product</h3>
@@ -168,11 +176,18 @@
     <input type="number" id="productQty" class="input" value="1" min="0" placeholder="Enter quantity">
     <input type="text" id="productColor" class="input" placeholder="Color (e.g., Red, Blue)">
     <input type="text" id="productSizes" class="input" placeholder="Sizes (e.g., M, L, XL)">
-    <label class="muted" style="display:block; margin-top:6px;">Product Image:</label>
-    <input type="file" id="productImageFile" accept="image/*" class="input">
-    <div class="center muted" style="margin:6px 0;">OR</div>
-    <input type="text" id="productImage" class="input" placeholder="Paste Image URL (Optional)">
+    
+    <label class="muted" style="display:block; margin-top:6px;">Default Product Image URL:</label>
+    <input type="text" id="productImage" class="input" placeholder="Paste Default Image URL (Required)">
 
+    <div class="center muted" style="margin:6px 0;">OR</div>
+    <label class="muted" style="display:block; margin-top:6px;">Upload Default Product Image:</label>
+    <input type="file" id="productImageFile" accept="image/*" class="input">
+
+    <button class="btn" id="manageColorImagesBtn" style="width:100%; margin:10px 0;">
+      Manage Color-Specific Images
+    </button>
+    
     <select id="productStock" class="input">
       <option value="true">Available</option>
       <option value="false">Out of Stock</option>
@@ -185,12 +200,25 @@
   </div>
 </div>
 
-<!-- Change PIN Modal -->
+<div class="modal" id="colorImageModal">
+  <div class="modal-box">
+    <h3>Manage Color Images for <span id="colorImageProductName" style="color:var(--accent)"></span></h3>
+    <p class="muted">Enter a color and its corresponding image URL or upload a file. The colors must match the list in the main product form.</p>
+    
+    <div id="colorImageInputs" style="margin-top:10px;">
+      </div>
+
+    <div class="row" style="gap:8px; margin-top:16px;">
+      <button class="btn primary" id="saveColorImagesBtn">Save Color Images</button>
+      <button class="btn" id="closeColorImageBtn">Close</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal" id="changePinModal">
   <div class="modal-box">
     <h3>Change Admin PIN</h3>
 
-    <!-- Step 1: Ask Security Question -->
     <div id="changePinStep1">
       <p id="securityQuestionText" class="muted"></p>
       <input type="text" id="securityAnswerVerify" class="input" placeholder="Enter Answer">
@@ -200,7 +228,6 @@
       </div>
     </div>
 
-    <!-- Step 2: Set New PIN -->
     <div id="changePinStep2" style="display:none;">
       <input type="password" id="newPinInput" class="input" placeholder="Enter New PIN">
       <div style="text-align:right; margin-top:10px;">
@@ -211,7 +238,6 @@
   </div>
 </div>
 
-<!-- Image Preview Modal -->
 <div class="modal" id="imagePreviewModal">
   <div class="modal-box" style="max-width:800px; padding:0; position:relative;">
     <img id="previewImage" src="" style="width:100%; height:auto; display:block;">
@@ -222,7 +248,6 @@
   </div>
 </div>
 
-<!-- Loading Modal (For Admin Actions) -->
 <div class="modal" id="loadingModal">
   <div class="modal-box" style="max-width:200px; text-align:center; padding:20px;">
     <div class="loader"></div>
@@ -231,7 +256,6 @@
 </div>
 
 
-<!-- Your app logic -->
 <script src="script.js"></script>
 </body>
 </html>
