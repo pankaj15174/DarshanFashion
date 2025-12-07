@@ -287,21 +287,28 @@ footer a:hover {
 .center{ text-align:center }
 .row{ display:flex; flex-wrap:wrap; }
 
-/* Image Preview Modal Styling */
+/* 🆕 Image Preview Modal Styling for Draggable Zoom */
 #imagePreviewModal img {
   cursor: zoom-in;
+  /* Set a fixed size relative to the modal box for predictable scaling */
+  width: auto; 
+  height: auto;
+  max-width: 100%; /* Keeps it fit inside the modal on load */
+  max-height: 100%;
+  object-fit: contain;
   transition: transform 0.2s ease-in-out;
-}
-#imagePreviewModal img.zoomed {
-  transform: scale(2); /* Zoom level */
-  cursor: zoom-out;
+  user-select: none; /* Prevent highlighting when dragging */
+  -webkit-user-drag: none; /* Prevent browser-native image dragging */
 }
 
-#previewImage {
-  max-width: 90vw;
-  max-height: 90vh;
-  object-fit: contain;
+/* When zoomed, the cursor changes to a grabbing hand */
+#imagePreviewModal img.zoomed {
+  cursor: grab; /* Indicates it's draggable */
 }
+#imagePreviewModal img.zoomed:active {
+  cursor: grabbing;
+}
+
 
 /* Fix 4: Loading Spinner CSS */
 .loader {

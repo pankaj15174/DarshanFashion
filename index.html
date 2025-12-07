@@ -154,6 +154,13 @@
   <div class="modal-box">
     <h3>Add Category</h3>
     <input type="text" id="newCategoryName" class="input" placeholder="Category Name">
+    
+    <label class="muted" style="display:block; margin-top:6px;">Default Category Image URL:</label>
+    <input type="text" id="categoryImage" class="input" placeholder="Paste Default Image URL (Required)">
+
+    <div class="center muted" style="margin:6px 0;">OR</div>
+    <label class="muted" style="display:block; margin-top:6px;">Upload Default Category Image:</label>
+    <input type="file" id="categoryImageFile" accept="image/*" class="input">
     <div class="row" style="gap:8px; margin-top:6px;">
       <button class="btn primary" id="saveCategoryBtn">Save</button>
       <button class="btn" id="closeCategoryBtn">Cancel</button>

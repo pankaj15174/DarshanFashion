@@ -7,6 +7,8 @@
  - UPDATED: Default image is editable
  - UPDATED: No color is pre-selected on page load. Default image is shown.
  - 🟨 FIX: Dynamic image source for Image Preview Modal.
+ - 🆕 FEATURE: Category Image Management (Add/Edit)
+ - 🆕 FEATURE: Full Draggable Panning Zoom
 ********************************************/
 
 /* ---------- Supabase Client ---------- */
@@ -20,7 +22,8 @@ const BUCKET = window.__SUPABASE_BUCKET__;
 let isAdmin = false;
 let selectedCategoryId = null;
 let editingProductId = null;
-let categoriesCache = [];   // [{id,name}]
+let editingCategoryId = null; // 🆕 Added for category editing
+let categoriesCache = [];   // [{id,name,img_url}]
 let productsCache = [];     // products with joined category if needed
 let adminConfig = null;     // {id, admin_pin, security_question, security_answer}
 
@@ -31,6 +34,14 @@ const selectedImages = {};  // { [productId]: "URL" } To store the currently dis
 
 /* State for Color Images in Admin Flow */
 let colorImagesData = {}; // { "ColorName": "ImageURL" }
+
+
+/* State for Draggable Panning Zoom */
+let isDragging = false;
+let startX, startY;
+let initialX, initialY; // Stores the current translation state
+let currentPanX = 0;
+let currentPanY = 0;
 
 
 /* ---------- Helpers ---------- */
@@ -103,11 +114,29 @@ const addCategoryBtn = $("addCategoryBtn");
 const addProductBtn = $("addProductBtn");
 const logoutBtn = $("logoutBtn");
 
-/* Category Modal */
+/* Category Modal 🆕 Updated elements for image */
 const categoryModal = $("categoryModal");
 const newCategoryName = $("newCategoryName");
 const saveCategoryBtn = $("saveCategoryBtn");
 const closeCategoryBtn = $("closeCategoryBtn");
+const categoryImage = document.createElement("input"); // Creating element dynamically for image URL
+categoryImage.setAttribute("type", "text");
+categoryImage.setAttribute("id", "categoryImage");
+categoryImage.setAttribute("class", "input");
+categoryImage.setAttribute("placeholder", "Paste Default Image URL (Required)");
+const categoryImageFile = document.createElement("input"); // Creating element dynamically for image file
+categoryImageFile.setAttribute("type", "file");
+categoryImageFile.setAttribute("id", "categoryImageFile");
+categoryImageFile.setAttribute("accept", "image/*");
+categoryImageFile.setAttribute("class", "input");
+categoryImageFile.style.marginTop = '6px';
+
+// Append new elements to category modal box (or inject them directly into index.html)
+// For now, let's keep it simple by appending them inside the logic below
+const categoryModalBox = categoryModal.querySelector('.modal-box');
+categoryModalBox.insertBefore(categoryImage, saveCategoryBtn.closest('.row'));
+categoryModalBox.insertBefore(categoryImageFile, saveCategoryBtn.closest('.row'));
+
 
 /* Product Modal */
 const productModal = $("productModal");
@@ -134,7 +163,7 @@ const saveColorImagesBtn = $("saveColorImagesBtn");
 const closeColorImageBtn = $("closeColorImageBtn");
 
 
-/* Image Preview */
+/* Image Preview 🆕 Updated elements for drag/zoom */
 const imagePreviewModal = $("imagePreviewModal");
 const previewImage = $("previewImage");
 const closeImagePreview = $("closeImagePreview");
@@ -248,12 +277,13 @@ async function changeAdminPin(newPin) {
 }
 
 /***********************
- * Supabase – Categories
+ * Supabase – Categories 🆕 Updated
  ***********************/
 async function fetchCategories() {
+  // 🆕 Include img_url in select
   const { data, error } = await supabase
     .from("categories")
-    .select("*")
+    .select("id, name, img_url")
     .order("name", { ascending: true });
 
   if (error) {
@@ -266,15 +296,30 @@ async function fetchCategories() {
   renderProductsDropdown();
 }
 
-async function addCategoryToSupabase(name) {
+// 🆕 Function to add a category (now includes image URL)
+async function addCategoryToSupabase(name, imgUrl) {
   const { error } = await supabase
     .from("categories")
-    .insert([{ name: sanitize(name) }]);
+    .insert([{ name: sanitize(name), img_url: imgUrl }]);
   if (error) {
     alert("Failed to add category!");
     console.error(error);
   }
   await fetchCategories();
+}
+
+// 🆕 Function to update a category (now includes image URL)
+async function updateCategoryInSupabase(id, name, imgUrl) {
+  const { error } = await supabase
+    .from("categories")
+    .update({ name: sanitize(name), img_url: imgUrl })
+    .eq("id", id);
+  if (error) {
+    alert("Failed to update category!");
+    console.error(error);
+    return false;
+  }
+  return true;
 }
 
 async function deleteCategoryFromSupabase(catId) {
@@ -423,8 +468,9 @@ async function deleteProductFromSupabase(id) {
 /***********************
  * Supabase – Storage (Images)
  ***********************/
-async function uploadImageToSupabase(file) {
-  const fileName = `products/${Date.now()}_${file.name}`;
+async function uploadImageToSupabase(file, isCategory = false) {
+  const folder = isCategory ? 'categories' : 'products'; // 🆕 Select folder
+  const fileName = `${folder}/${Date.now()}_${file.name}`;
   const { error } = await supabase.storage.from(BUCKET).upload(fileName, file);
   if (error) {
     console.error("Upload error:", error);
@@ -543,22 +589,85 @@ saveNewPinBtn.addEventListener("click", async () => {
 });
 
 /***********************
- * Category Management
+ * Category Management 🆕 Updated
  ***********************/
 addCategoryBtn.addEventListener("click", () => {
   if (!isAdmin) return window.alert("Admin only.");
+  editingCategoryId = null; // Clear editing state
+  newCategoryName.value = "";
+  categoryImage.value = "";
+  categoryImageFile.value = "";
+  saveCategoryBtn.textContent = "Save"; // Set button text for ADD
+  categoryModal.querySelector('h3').textContent = "Add Category";
   categoryModal.classList.add("open");
 });
+
 closeCategoryBtn.addEventListener("click", () => {
   categoryModal.classList.remove("open");
+  editingCategoryId = null;
 });
+
+// 🆕 Edit Category function
+window.editCategory = function (id) {
+    if (!isAdmin) return window.alert("Admin only.");
+    const cat = categoriesCache.find(c => String(c.id) === String(id));
+    if (!cat) return;
+    editingCategoryId = id;
+    
+    // Open modal & prefill
+    newCategoryName.value = cat.name;
+    categoryImage.value = cat.img_url || "";
+    categoryImageFile.value = ""; // Clear file input for edit
+    saveCategoryBtn.textContent = "Update"; // Set button text for EDIT
+    categoryModal.querySelector('h3').textContent = "Edit Category";
+    categoryModal.classList.add("open");
+};
+
 
 saveCategoryBtn.addEventListener("click", async () => {
   if (!isAdmin) return window.alert("Admin only.");
   const name = sanitize(newCategoryName.value);
   if (!name) return window.alert("Please enter a category name");
-  await addCategoryToSupabase(name);
+  
+  showLoading();
+  
+  let imgUrl = sanitize(categoryImage.value);
+  const file = categoryImageFile && categoryImageFile.files ? categoryImageFile.files[0] : null;
+
+  // 1. Handle image upload (if a file is present)
+  if (file) {
+      const uploadUrl = await uploadImageToSupabase(file, true); // true for isCategory
+      if (!uploadUrl) {
+          hideLoading();
+          return; // upload failed
+      }
+      imgUrl = uploadUrl;
+  } 
+
+  // 2. Final image URL check
+  if (!imgUrl) {
+      window.alert("Please provide a Default Image URL or upload a file!");
+      hideLoading();
+      return;
+  }
+
+  // 3. Save/Update logic
+  if (editingCategoryId) {
+      const updated = await updateCategoryInSupabase(editingCategoryId, name, imgUrl);
+      if (updated) {
+          window.alert("✅ Category updated successfully!");
+      }
+      editingCategoryId = null; // Clear edit state
+  } else {
+      // Add mode
+      await addCategoryToSupabase(name, imgUrl);
+      window.alert("✅ Category added successfully!");
+  }
+  
+  hideLoading();
   newCategoryName.value = "";
+  categoryImage.value = "";
+  categoryImageFile.value = "";
   categoryModal.classList.remove("open");
 });
 
@@ -912,13 +1021,19 @@ window.openWhatsApp = function (productId) {
   window.open(url, "_blank");
 };
 
-// 🟨 FIX: Update openImagePreview to use selectedImages[productId]
+// 🟨 FIX: Update openImagePreview to use selectedImages[productId] and initialize drag state
 window.openImagePreview = function (productId) {
   const src = selectedImages[productId];
-  if (!src) return; // Should not happen if selectedImages is kept up to date
+  if (!src) return; 
 
   previewImage.src = src;
+  
+  // 🆕 Reset pan/zoom state for new image
   previewImage.classList.remove("zoomed");
+  previewImage.style.transform = `translate(0px, 0px) scale(1)`; 
+  currentPanX = 0;
+  currentPanY = 0;
+  
   imagePreviewModal.classList.add("open");
 };
 
@@ -932,22 +1047,26 @@ function renderHome() {
     <div class="grid">
       ${categoriesCache
         .map(
-          (cat) => `
-        <div class="card">
-          <img src="https://dummyimage.com/600x400/f3f4f6/555&text=${encodeURIComponent(
-            cat.name
-          )}" class="thumb" onclick="openCategory('${cat.id}')">
-          <div class="card-body">
-            ${cat.name}
-            ${
-              isAdmin
-                ? `<button class="btn" style="float:right;background:red;color:white;"
-                     onclick="deleteCategoryFromSupabase('${cat.id}')">Delete</button>`
-                : ""
-            }
-          </div>
-        </div>
-      `
+          (cat) => {
+            // 🆕 Use the actual category image URL or a fallback
+            const imageUrl = cat.img_url || `https://dummyimage.com/600x400/f3f4f6/555&text=${encodeURIComponent(cat.name)}`;
+            return `
+              <div class="card">
+                <img src="${imageUrl}" class="thumb" onclick="openCategory('${cat.id}')">
+                <div class="card-body">
+                  ${cat.name}
+                  ${
+                    isAdmin
+                      ? `<button class="btn" style="float:right;background:red;color:white;margin-left:8px;"
+                           onclick="deleteCategoryFromSupabase('${cat.id}')">Delete</button>
+                         <button class="btn" style="float:right;"
+                           onclick="editCategory('${cat.id}')">Edit</button>` // 🆕 Edit Button
+                      : ""
+                  }
+                </div>
+              </div>
+            `;
+          }
         )
         .join("")}
     </div>
@@ -1107,15 +1226,97 @@ function renderProducts() {
 }
 
 /***********************
- * Image Preview & Zoom
+ * Image Preview & Zoom/Drag 🆕 Updated
  ***********************/
 
 closeImagePreview.addEventListener("click", () => {
   imagePreviewModal.classList.remove("open");
 });
 
+// Toggle Zoom on click
 previewImage.addEventListener("click", () => {
-  previewImage.classList.toggle("zoomed");
+  // Toggle the 'zoomed' class
+  const isZoomed = previewImage.classList.toggle("zoomed");
+  
+  if (isZoomed) {
+    // Zoom in: Set initial scale and reset pan
+    previewImage.style.transform = `translate(0px, 0px) scale(2)`;
+    currentPanX = 0;
+    currentPanY = 0;
+  } else {
+    // Zoom out: Reset transform
+    previewImage.style.transform = `translate(0px, 0px) scale(1)`;
+    currentPanX = 0;
+    currentPanY = 0;
+  }
+});
+
+
+// DRAG/PAN Logic (Only when zoomed)
+previewImage.addEventListener('mousedown', (e) => {
+    if (!previewImage.classList.contains('zoomed')) return;
+
+    isDragging = true;
+    startX = e.clientX;
+    startY = e.clientY;
+    
+    // Store the initial translation to calculate the new position
+    const currentTransform = previewImage.style.transform || 'translate(0px, 0px) scale(2)';
+    const match = currentTransform.match(/translate\(([-\d.]+px),\s*([-\d.]+px)\)/);
+    
+    if (match) {
+        initialX = parseFloat(match[1]);
+        initialY = parseFloat(match[2]);
+    } else {
+        initialX = 0;
+        initialY = 0;
+    }
+
+    previewImage.style.transition = 'none'; // Disable smooth transition while dragging
+    e.preventDefault(); // Prevent default browser drag behaviors
+});
+
+imagePreviewModal.addEventListener('mousemove', (e) => {
+    if (!isDragging) return;
+    
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
+
+    let newPanX = initialX + dx;
+    let newPanY = initialY + dy;
+    
+    // Limit panning so the image boundary doesn't exceed the container bounds (this is complex and often requires a library, but here's a basic limit)
+    const box = previewImage.getBoundingClientRect();
+    const modalBox = imagePreviewModal.querySelector('.modal-box');
+    
+    // Simple Boundary Constraint (approximate)
+    const maxPanX = box.width / 4; 
+    const maxPanY = box.height / 4; 
+    const minPanX = -maxPanX;
+    const minPanY = -maxPanY;
+
+    newPanX = Math.min(maxPanX, Math.max(minPanX, newPanX));
+    newPanY = Math.min(maxPanY, Math.max(minPanY, newPanY));
+    
+    // Apply the translation
+    previewImage.style.transform = `translate(${newPanX}px, ${newPanY}px) scale(2)`;
+    currentPanX = newPanX;
+    currentPanY = newPanY;
+});
+
+imagePreviewModal.addEventListener('mouseup', () => {
+    if (isDragging) {
+        isDragging = false;
+        previewImage.style.transition = 'transform 0.2s ease-in-out'; // Re-enable transition
+    }
+});
+
+// Also stop dragging if mouse leaves the modal (safety)
+imagePreviewModal.addEventListener('mouseleave', () => {
+    if (isDragging) {
+        isDragging = false;
+        previewImage.style.transition = 'transform 0.2s ease-in-out'; 
+    }
 });
 
 imagePreviewModal.addEventListener("click", (e) => {
