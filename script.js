@@ -12,7 +12,7 @@
 ********************************************/
 
 /* ---------- Supabase Client ---------- */
-const supabase = window.supabase.createClient(
+const supabaseClient = window.supabase.createClient(
   window.__SUPABASE_URL__,
   window.__SUPABASE_ANON_KEY__
 );
@@ -200,7 +200,7 @@ document.querySelectorAll("nav a").forEach((a) =>
  * Supabase – Admin Config
  ***********************/
 async function ensureAdminConfigRow() {
-  const { data, error } = await supabase
+  const { data, error } = await supabaseClient
     .from("admin_config")
     .select("*")
     .limit(1)
@@ -212,7 +212,7 @@ async function ensureAdminConfigRow() {
   }
 
   if (!data) {
-    const { error: insErr } = await supabase
+    const { error: insErr } = await supabaseClient
       .from("admin_config")
       .insert([{ admin_pin: "admin123", security_question: null, security_answer: null }]);
     if (insErr) console.error("Error creating default admin_config:", insErr);
@@ -223,7 +223,7 @@ async function ensureAdminConfigRow() {
 }
 
 async function refreshAdminConfig() {
-  const { data, error } = await supabase
+  const { data, error } = await supabaseClient
     .from("admin_config")
     .select("*")
     .limit(1)
@@ -241,7 +241,7 @@ async function setSecurityQuestion(qKey, ans) {
   await refreshAdminConfig();
   const { id } = adminConfig;
 
-  const { error } = await supabase
+  const { error } = await supabaseClient
     .from("admin_config")
     .update({
       security_question: qKey,
@@ -261,7 +261,7 @@ async function changeAdminPin(newPin) {
   await refreshAdminConfig();
   const { id } = adminConfig;
 
-  const { error } = await supabase
+  const { error } = await supabaseClient
     .from("admin_config")
     .update({
       admin_pin: sanitize(newPin)
@@ -281,7 +281,7 @@ async function changeAdminPin(newPin) {
  ***********************/
 async function fetchCategories() {
   // 🆕 Include img_url in select
-  const { data, error } = await supabase
+  const { data, error } = await supabaseClient
     .from("categories")
     .select("id, name, img_url")
     .order("name", { ascending: true });
@@ -298,7 +298,7 @@ async function fetchCategories() {
 
 // 🆕 Function to add a category (now includes image URL)
 async function addCategoryToSupabase(name, imgUrl) {
-  const { error } = await supabase
+  const { error } = await supabaseClient
     .from("categories")
     .insert([{ name: sanitize(name), img_url: imgUrl }]);
   if (error) {
@@ -310,7 +310,7 @@ async function addCategoryToSupabase(name, imgUrl) {
 
 // 🆕 Function to update a category (now includes image URL)
 async function updateCategoryInSupabase(id, name, imgUrl) {
-  const { error } = await supabase
+  const { error } = await supabaseClient
     .from("categories")
     .update({ name: sanitize(name), img_url: imgUrl })
     .eq("id", id);
@@ -325,7 +325,7 @@ async function updateCategoryInSupabase(id, name, imgUrl) {
 async function deleteCategoryFromSupabase(catId) {
   // Use custom modal or keep standard confirm for simplicity here
   if (!window.confirm("Delete this category and all products under it?")) return;
-  const { error } = await supabase
+  const { error } = await supabaseClient
     .from("categories")
     .delete()
     .eq("id", catId);
@@ -339,7 +339,7 @@ async function deleteCategoryFromSupabase(catId) {
 
 async function fetchProducts() {
   // include 'color', 'sizes' AND 'color_images_json' in the select list
-  const { data, error } = await supabase
+  const { data, error } = await supabaseClient
     .from("products")
     .select("id,name,category_id,mrp,price,quantity,img_url,color,sizes,color_images_json, categories(name)")
     .order("name", { ascending: true });
@@ -370,7 +370,7 @@ async function addProductToSupabase({ name, categoryId, mrp, price, quantity, im
     color_images_json: colorImagesJson || null 
   };
 
-  const { error } = await supabase.from("products").insert([payload]);
+  const { error } = await supabaseClient.from("products").insert([payload]);
   if (error) {
     console.error(error);
     return { ok: false, message: "Failed to add product!" };
@@ -445,7 +445,7 @@ async function updateProductInSupabase(id, { name, categoryId, mrp, price, quant
     sizes: sanitize(sizes),
     color_images_json: colorImagesJson || null 
   };
-  const { error } = await supabase.from("products").update(payload).eq("id", id);
+  const { error } = await supabaseClient.from("products").update(payload).eq("id", id);
   if (error) {
     console.error(error);
     return { ok: false, message: "Failed to update product!" };
@@ -456,7 +456,7 @@ async function updateProductInSupabase(id, { name, categoryId, mrp, price, quant
 async function deleteProductFromSupabase(id) {
   // Use custom modal or keep standard confirm for simplicity here
   if (!window.confirm("Delete this product?")) return;
-  const { error } = await supabase.from("products").delete().eq("id", id);
+  const { error } = await supabaseClient.from("products").delete().eq("id", id);
   if (error) {
     alert("Failed to delete product!");
     console.error(error);
@@ -471,13 +471,13 @@ async function deleteProductFromSupabase(id) {
 async function uploadImageToSupabase(file, isCategory = false) {
   const folder = isCategory ? 'categories' : 'products'; // 🆕 Select folder
   const fileName = `${folder}/${Date.now()}_${file.name}`;
-  const { error } = await supabase.storage.from(BUCKET).upload(fileName, file);
+  const { error } = await supabaseClient.storage.from(BUCKET).upload(fileName, file);
   if (error) {
     console.error("Upload error:", error);
     alert("Failed to upload image!");
     return null;
   }
-  const { data: urlData } = supabase.storage.from(BUCKET).getPublicUrl(fileName);
+  const { data: urlData } = supabaseClient.storage.from(BUCKET).getPublicUrl(fileName);
   return urlData.publicUrl;
 }
 
